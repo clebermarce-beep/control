@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0056b3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Control">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Control - Controle Financeiro Pessoal</title>
+    <style>
+        :root {
+            --primary-blue: #0056b3;
+            --light-blue: #add8e6;
+            --light-red: #ffcccb;
+            --success-green: #28a745;
+            --dark-gray: #333;
+            --danger-red: #dc3545;
+            --saldo-positivo: #0056b3;
+            --saldo-negativo: #dc3545;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; padding: 0;
+            background-color: #f0f2f5;
+            color: var(--dark-gray);
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background-color: white; width: 100%; text-align: center;
+            padding: 15px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header-title { font-size: 24px; font-weight: bold; color: var(--primary-blue); margin: 5px 0 0; }
+        .header-sub { font-size: 12px; color: #888; margin: 0; }
+        .container {
+            width: 95%; max-width: 500px; margin: 15px 0;
+            background: white; padding: 20px; border-radius: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05); box-sizing: border-box;
+        }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        input, select {
+            width: 100%; padding: 12px; border: 1px solid #ddd;
+            border-radius: 10px; box-sizing: border-box; font-size: 16px;
+        }
+        .btn {
+            width: 100%; padding: 14px; border: none; border-radius: 10px;
+            font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px;
+        }
+        .btn-add { background-color: var(--primary-blue); color: white; }
+        .btn-report { background-color: var(--success-green); color: white; margin-top: 20px; }
+        .btn-danger { background-color: var(--danger-red); color: white; }
+
+        .tabs { display: flex; gap: 5px; margin-bottom: 15px; }
+        .tab {
+            flex: 1; padding: 12px; text-align: center; border: 2px solid var(--primary-blue);
+            border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 14px;
+            background: white; color: var(--primary-blue); transition: all 0.2s;
+        }
+        .tab.active { background: var(--primary-blue); color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .item {
+            background: #fff; border: 1px solid #eee; padding: 15px;
+            border-radius: 15px; margin-bottom: 10px;
+        }
+        .item-header { display: flex; justify-content: space-between; align-items: center; }
+        .item-name { font-weight: bold; font-size: 16px; }
+        .item-value { font-weight: bold; font-size: 16px; }
+        .item-actions { display: flex; gap: 10px; margin-top: 8px; }
+        .item-actions button {
+            border: none; background: none; cursor: pointer; font-size: 13px; padding: 5px 10px; border-radius: 5px;
+        }
+        .btn-edit { color: var(--primary-blue); background: #e8f0fe !important; }
+        .btn-delete { color: var(--danger-red); background: #fce4ec !important; }
+
+        .mini-btn {
+            border: none; cursor: pointer; font-size: 11px; font-weight: bold;
+            padding: 4px 8px; border-radius: 6px; margin-left: 8px;
+        }
+        .mini-pagar { background: #e8f7ec; color: var(--success-green); }
+        .mini-receber { background: #e8f0fe; color: var(--primary-blue); }
+        .mini-reabrir { background: #eef0f2; color: #6c757d; }
+
+        .mode-toggle { display: flex; gap: 5px; margin-bottom: 15px; }
+        .mode-btn {
+            flex: 1; padding: 10px; border: 2px solid var(--primary-blue);
+            background: white; color: var(--primary-blue); border-radius: 10px;
+            font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;
+        }
+        .mode-btn.active { background: var(--primary-blue); color: white; }
+
+        .saldo-card {
+            padding: 15px; border-radius: 15px; text-align: center;
+            margin-bottom: 15px; font-size: 18px; font-weight: bold; color: white;
+        }
+        .saldo-positivo { background: var(--saldo-positivo); }
+        .saldo-negativo { background: var(--saldo-negativo); }
+
+        .resumo-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee; }
+        .resumo-item:last-child { border-bottom: none; }
+
+        .quinzena-title {
+            font-size: 16px; font-weight: bold; color: var(--primary-blue);
+            margin: 15px 0 10px; padding-bottom: 5px; border-bottom: 2px solid var(--primary-blue);
+        }
+
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 5px;
+            font-size: 11px; font-weight: bold; color: white;
+        }
+        .badge-receita { background: var(--success-green); }
+        .badge-despesa { background: var(--danger-red); }
+        .badge-dia5 { background: #6c757d; }
+        .badge-dia20 { background: #495057; }
+
+        #modal, #overlay { display: none; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; }
+        #modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 25px; border-radius: 20px;
+            z-index: 1000; width: 90%; max-width: 450px;
+            max-height: 85vh; overflow-y: auto;
+        }
+
+        footer { margin-top: auto; padding: 20px; text-align: center; font-size: 0.85em; color: #666; width: 100%; }
+
+        .empty-msg { text-align: center; color: #999; padding: 20px 0; }
+
+        .select-month { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
+        .select-month select { flex: 1; }
+        .select-month button {
+            padding: 12px 16px; border: none; border-radius: 10px;
+            background: var(--primary-blue); color: white; cursor: pointer; font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1 class="header-title">Control</h1>
+    <p class="header-sub">Controle Financeiro Pessoal</p>
+</header>
+
+<div class="container">
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('painel')">Painel</div>
+        <div class="tab" onclick="switchTab('receitas')">Receitas</div>
+        <div class="tab" onclick="switchTab('despesas')">Despesas</div>
+        <div class="tab" onclick="switchTab('gerenciar')">Gerenciar</div>
+    </div>
+
+    <!-- ABA PAINEL -->
+    <div id="tab-painel" class="tab-content active">
+        <div class="select-month">
+            <select id="mesSelecionado" onchange="renderPainel()"></select>
+        </div>
+        <div class="mode-toggle">
+            <button id="modo-todas" class="mode-btn" onclick="setModo('todas')">Todas</button>
+            <button id="modo-baixadas" class="mode-btn" onclick="setModo('baixadas')">Só baixadas</button>
+        </div>
+        <div style="display:flex; gap:6px; margin-bottom:15px; align-items:center;">
+            <label for="saldoInicialValor" style="font-size:13px; font-weight:bold; white-space:nowrap;">Saldo inicial:</label>
+            <input type="number" id="saldoInicialValor" step="0.01" placeholder="0.00"
+                   style="flex:1; min-width:0; width:auto;">
+            <button style="flex:none; width:auto; margin:0; padding:10px 14px; border:none; border-radius:10px;
+                    background:var(--primary-blue); color:white; font-size:14px; font-weight:bold; cursor:pointer;"
+                    onclick="salvarSaldoInicial()">OK</button>
+            <button style="flex:none; width:auto; margin:0; padding:10px 14px; border:none; border-radius:10px;
+                    background:#666; color:white; font-size:14px; font-weight:bold; cursor:pointer;"
+                    title="Usar o saldo do mês anterior automaticamente" onclick="usarSaldoAutomatico()">Auto</button>
+        </div>
+        <div id="painelContent"></div>
+    </div>
+
+    <!-- ABA RECEITAS -->
+    <div id="tab-receitas" class="tab-content">
+        <h3>Adicionar Receita</h3>
+        <div class="form-group">
+            <label>Descrição</label>
+            <input type="text" id="recDescricao" placeholder="Ex: Salário, Freelance...">
+        </div>
+        <div class="form-group">
+            <label>Valor (R$)</label>
+            <input type="number" id="recValor" placeholder="0.00" step="0.01">
+        </div>
+        <div class="form-group">
+            <label>Quinzena</label>
+            <select id="recQuinzena">
+                <option value="dia5">Dia 5 (1ª Quinzena)</option>
+                <option value="dia20">Dia 20 (2ª Quinzena)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Tipo</label>
+            <select id="recTipo">
+                <option value="salario">Salário</option>
+                <option value="extra">Receita Extra</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Mês/Ano</label>
+            <input type="month" id="recMes">
+        </div>
+        <button class="btn btn-add" onclick="addReceita()">ADICIONAR RECEITA</button>
+    </div>
+
+    <!-- ABA DESPESAS -->
+    <div id="tab-despesas" class="tab-content">
+        <h3>Adicionar Despesa</h3>
+        <div class="form-group">
+            <label>Descrição</label>
+            <input type="text" id="despDescricao" placeholder="Ex: Aluguel, Luz, Internet...">
+        </div>
+        <div class="form-group">
+            <label>Valor (R$)</label>
+            <input type="number" id="despValor" placeholder="0.00" step="0.01">
+        </div>
+        <div class="form-group">
+            <label>Quinzena</label>
+            <select id="despQuinzena">
+                <option value="dia5">Dia 5 (1ª Quinzena)</option>
+                <option value="dia20">Dia 20 (2ª Quinzena)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Mês/Ano</label>
+            <input type="month" id="despMes">
+        </div>
+        <button class="btn btn-danger" onclick="addDespesa()">ADICIONAR DESPESA</button>
+    </div>
+
+    <!-- ABA GERENCIAR -->
+    <div id="tab-gerenciar" class="tab-content">
+        <h3>Gerenciar Lançamentos</h3>
+        <div class="select-month">
+            <select id="mesGerenciar" onchange="renderGerenciar()"></select>
+        </div>
+        <button class="btn btn-add" style="margin-top:0; margin-bottom:15px;" onclick="duplicarMes()">📄 Duplicar para o Próximo Mês</button>
+        <div id="gerenciarContent"></div>
+
+        <div class="quinzena-title" style="margin-top:20px;">💾 Histórico</div>
+        <p style="font-size:12px; color:#888; margin:0 0 10px;">
+            Baixa uma cópia do arquivo com os dados atuais embutidos. Para rever, abra essa cópia e escolha o mês/ano.
+        </p>
+        <button class="btn btn-add" style="margin-top:0;" onclick="salvarHistorico()">💾 Salvar Histórico</button>
+
+        <div class="quinzena-title" style="margin-top:20px;">🔒 Proteção por PIN</div>
+        <p style="font-size:12px; color:#888; margin:0 0 10px;">
+            Define um PIN de 4 dígitos. O app só abre depois de digitar o PIN correto.
+        </p>
+        <div style="display:flex; gap:6px;">
+            <input type="password" id="pinConfig" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+                   placeholder="****" style="flex:1; text-align:center; font-size:20px; letter-spacing:10px;">
+            <button style="flex:none; width:auto; margin:0; padding:10px 14px; border:none; border-radius:10px;
+                    background:var(--primary-blue); color:white; font-size:14px; font-weight:bold; cursor:pointer;"
+                    onclick="definirPin()">Definir</button>
+            <button style="flex:none; width:auto; margin:0; padding:10px 14px; border:none; border-radius:10px;
+                    background:#666; color:white; font-size:14px; font-weight:bold; cursor:pointer;"
+                    onclick="removerPin()">Remover</button>
+        </div>
+    </div>
+</div>
+
+<div id="overlay" onclick="closeModal()"></div>
+<div id="modal">
+    <h3 id="modalTitle">Editar</h3>
+    <div id="modalContent"></div>
+    <div style="display:flex; gap:10px; margin-top:15px;">
+        <button class="btn btn-add" onclick="saveEdit()" style="flex:1;">SALVAR</button>
+        <button class="btn" onclick="closeModal()" style="flex:1; background:#666; color:white;">CANCELAR</button>
+    </div>
+</div>
+
+<!-- Tela de bloqueio por PIN -->
+<div id="pinOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+     background:rgba(0,0,0,0.9); z-index:2000; flex-direction:column; align-items:center; justify-content:center;">
+    <div style="background:white; padding:30px; border-radius:20px; text-align:center; width:90%; max-width:320px; box-sizing:border-box;">
+        <h3 style="color:var(--primary-blue); margin:0 0 5px;">Control 🔒</h3>
+        <p style="color:#888; font-size:13px; margin:0 0 15px;">Digite seu PIN de 4 dígitos</p>
+        <input type="password" id="pinInput" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+               placeholder="****" style="text-align:center; font-size:24px; letter-spacing:12px;"
+               onkeydown="if(event.key==='Enter')verificarPin()">
+        <div id="pinErro" style="color:var(--danger-red); font-size:13px; min-height:18px; margin-top:5px;"></div>
+        <button class="btn btn-add" onclick="verificarPin()">ENTRAR</button>
+        <p style="font-size:11px; color:#bbb; margin-top:10px;">Altere ou remova o PIN na aba Gerenciar.</p>
+    </div>
+</div>
+
+<footer>
+    <p><strong>Control</strong> - Controle Financeiro Pessoal</p>
+    <p>Seus dados ficam salvos neste navegador.</p>
+</footer>
+
+<script>
+    // ======== DADOS ========
+    // Marcador usado pelo botão "Salvar Histórico" para embutir os dados na cópia.
+    const DADOS_EMBED = null;
+    const dadosBase = (typeof DADOS_EMBED === 'object' && DADOS_EMBED !== null)
+        ? DADOS_EMBED
+        : (JSON.parse(localStorage.getItem('controlFinanceiro') || 'null') || {});
+    let dados = {
+        receitas: dadosBase.receitas || [],
+        despesas: dadosBase.despesas || [],
+        saldosIniciais: dadosBase.saldosIniciais || {}
+    };
+    dados.receitas.forEach(r => { if (typeof r.recebido !== 'boolean') r.recebido = false; });
+    dados.despesas.forEach(d => { if (typeof d.pago !== 'boolean') d.pago = false; });
+    let editandoId = null;
+    let editandoTipo = null;
+    let modoSaldo = localStorage.getItem('controlModoSaldo') || 'todas';
+
+    function save() {
+        localStorage.setItem('controlFinanceiro', JSON.stringify(dados));
+    }
+
+    // ======== MESES ========
+    function getMesAtual() {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    }
+
+    function getMesesDisponiveis() {
+        const meses = new Set();
+        meses.add(getMesAtual());
+        dados.receitas.forEach(r => meses.add(r.mes));
+        dados.despesas.forEach(d => meses.add(d.mes));
+        return Array.from(meses).sort().reverse();
+    }
+
+    function formatMes(mesStr) {
+        const [ano, mes] = mesStr.split('-');
+        const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        return nomes[parseInt(mes) - 1] + '/' + ano;
+    }
+
+    function populateSelectMes() {
+        const meses = getMesesDisponiveis();
+        ['mesSelecionado', 'mesGerenciar'].forEach(id => {
+            const sel = document.getElementById(id);
+            const current = sel.value;
+            sel.innerHTML = '';
+            meses.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = formatMes(m);
+                sel.appendChild(opt);
+            });
+            if (current && meses.includes(current)) sel.value = current;
+        });
+    }
+
+    function setDefaultMes() {
+        const mesAtual = getMesAtual();
+        document.getElementById('recMes').value = mesAtual;
+        document.getElementById('despMes').value = mesAtual;
+    }
+
+    // ======== TABS ========
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach((t, i) => {
+            const tabs = ['painel', 'receitas', 'despesas', 'gerenciar'];
+            t.classList.toggle('active', tabs[i] === tab);
+        });
+        document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+        if (tab === 'painel') renderPainel();
+        if (tab === 'gerenciar') renderGerenciar();
+    }
+
+    // ======== MODO DO SALDO (todas / só baixadas) ========
+    function setModo(m) {
+        modoSaldo = m;
+        localStorage.setItem('controlModoSaldo', m);
+        updateModoBtns();
+        renderPainel();
+    }
+
+    function updateModoBtns() {
+        const t = document.getElementById('modo-todas');
+        const b = document.getElementById('modo-baixadas');
+        if (!t || !b) return;
+        t.classList.toggle('active', modoSaldo === 'todas');
+        b.classList.toggle('active', modoSaldo === 'baixadas');
+    }
+
+    // ======== RECEITAS ========
+    function addReceita() {
+        const descricao = document.getElementById('recDescricao').value.trim();
+        const valor = parseFloat(document.getElementById('recValor').value);
+        const quinzena = document.getElementById('recQuinzena').value;
+        const tipo = document.getElementById('recTipo').value;
+        const mes = document.getElementById('recMes').value;
+
+        if (!descricao || isNaN(valor) || valor <= 0 || !mes) {
+            alert('Preencha todos os campos corretamente!');
+            return;
+        }
+
+        dados.receitas.push({
+            id: Date.now(),
+            descricao: descricao.toUpperCase(),
+            valor, quinzena, tipo, mes, recebido: false
+        });
+
+        save();
+        document.getElementById('recDescricao').value = '';
+        document.getElementById('recValor').value = '';
+        setDefaultMes();
+        populateSelectMes();
+        alert('Receita adicionada!');
+    }
+
+    // ======== DESPESAS ========
+    function addDespesa() {
+        const descricao = document.getElementById('despDescricao').value.trim();
+        const valor = parseFloat(document.getElementById('despValor').value);
+        const quinzena = document.getElementById('despQuinzena').value;
+        const mes = document.getElementById('despMes').value;
+
+        if (!descricao || isNaN(valor) || valor <= 0 || !mes) {
+            alert('Preencha todos os campos corretamente!');
+            return;
+        }
+
+        dados.despesas.push({
+            id: Date.now(),
+            descricao: descricao.toUpperCase(),
+            valor, quinzena, mes, pago: false
+        });
+
+        save();
+        document.getElementById('despDescricao').value = '';
+        document.getElementById('despValor').value = '';
+        setDefaultMes();
+        populateSelectMes();
+        alert('Despesa adicionada!');
+    }
+
+    // ======== PAINEL ========
+    function renderPainel() {
+        const mes = document.getElementById('mesSelecionado').value;
+        const container = document.getElementById('painelContent');
+        if (!mes) { container.innerHTML = '<p class="empty-msg">Selecione um mês.</p>'; return; }
+
+        const recMes = dados.receitas.filter(r => r.mes === mes);
+        const despMes = dados.despesas.filter(d => d.mes === mes);
+        const recDia5List = recMes.filter(r => r.quinzena === 'dia5');
+        const despDia5List = despMes.filter(d => d.quinzena === 'dia5');
+        const recDia20List = recMes.filter(r => r.quinzena === 'dia20');
+        const despDia20List = despMes.filter(d => d.quinzena === 'dia20');
+
+        const c = calcularMes(mes, modoSaldo);
+        const rotuloRec = modoSaldo === 'baixadas' ? 'Total Recebido' : 'Total Receitas';
+        const rotuloDesp = modoSaldo === 'baixadas' ? 'Total Pago' : 'Total Despesas';
+
+        let html = '';
+
+        // === DIA 5 ===
+        html += '<div class="quinzena-title">📅 1ª Quinzena (Dia 5)</div>';
+
+        html += '<div class="item" style="border-left: 4px solid var(--success-green);">';
+        html += '<div style="font-weight:bold; color:var(--success-green); margin-bottom:8px;">💰 Receitas</div>';
+        if (c.saldoInicial !== 0) {
+            const sinal = c.saldoInicial > 0 ? '+' : '';
+            html += `<div class="resumo-item" style="color:#888; font-style:italic;"><span>Saldo do mês anterior</span><span style="color:var(--saldo-positivo);">${sinal} R$ ${c.saldoInicial.toFixed(2)}</span></div>`;
+        }
+        if (recDia5List.length === 0 && c.saldoInicial === 0) html += '<p class="empty-msg">Nenhuma receita.</p>';
+        recDia5List.forEach(r => { html += linhaItem('receita', r); });
+        html += `<div class="resumo-item" style="font-weight:bold; border-top:1px solid #ddd; padding-top:8px;"><span>${rotuloRec}</span><span style="color:var(--success-green);">R$ ${c.totalRecDia5.toFixed(2)}</span></div>`;
+        html += '</div>';
+
+        html += '<div class="item" style="border-left: 4px solid var(--danger-red);">';
+        html += '<div style="font-weight:bold; color:var(--danger-red); margin-bottom:8px;">📋 Despesas</div>';
+        if (despDia5List.length === 0) html += '<p class="empty-msg">Nenhuma despesa.</p>';
+        despDia5List.forEach(d => { html += linhaItem('despesa', d); });
+        html += `<div class="resumo-item" style="font-weight:bold; border-top:1px solid #ddd; padding-top:8px;"><span>${rotuloDesp}</span><span style="color:var(--danger-red);">R$ ${c.totalDespDia5.toFixed(2)}</span></div>`;
+        html += '</div>';
+
+        html += `<div class="saldo-card ${c.saldoDia5 >= 0 ? 'saldo-positivo' : 'saldo-negativo'}">
+            Saldo Dia 5: R$ ${c.saldoDia5.toFixed(2)}
+            ${c.saldoDia5 > 0 ? '<br><span style="font-size:12px;">↓ Transfere para Dia 20</span>' : ''}
+        </div>`;
+
+        // === DIA 20 ===
+        html += '<div class="quinzena-title">📅 2ª Quinzena (Dia 20)</div>';
+
+        html += '<div class="item" style="border-left: 4px solid var(--success-green);">';
+        html += '<div style="font-weight:bold; color:var(--success-green); margin-bottom:8px;">💰 Receitas</div>';
+        if (recDia20List.length === 0 && c.saldoTransferido === 0) html += '<p class="empty-msg">Nenhuma receita.</p>';
+        if (c.saldoTransferido > 0) {
+            html += `<div class="resumo-item" style="color:#888; font-style:italic;"><span>Saldo do Dia 5</span><span style="color:var(--saldo-positivo);">+ R$ ${c.saldoTransferido.toFixed(2)}</span></div>`;
+        }
+        recDia20List.forEach(r => { html += linhaItem('receita', r); });
+        html += `<div class="resumo-item" style="font-weight:bold; border-top:1px solid #ddd; padding-top:8px;"><span>${rotuloRec}</span><span style="color:var(--success-green);">R$ ${c.receitaTotalDia20.toFixed(2)}</span></div>`;
+        html += '</div>';
+
+        html += '<div class="item" style="border-left: 4px solid var(--danger-red);">';
+        html += '<div style="font-weight:bold; color:var(--danger-red); margin-bottom:8px;">📋 Despesas</div>';
+        if (despDia20List.length === 0) html += '<p class="empty-msg">Nenhuma despesa.</p>';
+        despDia20List.forEach(d => { html += linhaItem('despesa', d); });
+        html += `<div class="resumo-item" style="font-weight:bold; border-top:1px solid #ddd; padding-top:8px;"><span>${rotuloDesp}</span><span style="color:var(--danger-red);">R$ ${c.totalDespDia20.toFixed(2)}</span></div>`;
+        html += '</div>';
+
+        html += `<div class="saldo-card ${c.saldoDia20 >= 0 ? 'saldo-positivo' : 'saldo-negativo'}">
+            Saldo Dia 20: R$ ${c.saldoDia20.toFixed(2)}
+        </div>`;
+
+        // === SALDO FINAL ===
+        html += `<div class="saldo-card ${c.saldoFinal >= 0 ? 'saldo-positivo' : 'saldo-negativo'}" style="font-size:22px; margin-top:5px;">
+            💵 Saldo Final: R$ ${c.saldoFinal.toFixed(2)}
+        </div>`;
+
+        container.innerHTML = html;
+
+        const campoSaldo = document.getElementById('saldoInicialValor');
+        if (campoSaldo) campoSaldo.value = Math.round(c.saldoInicial * 100) / 100;
+    }
+
+    // Linha de lançamento com status e botão de dar baixa/reabrir
+    function linhaItem(tipo, item) {
+        const baixado = tipo === 'receita' ? item.recebido : item.pago;
+        const cor = tipo === 'receita' ? 'var(--success-green)' : 'var(--danger-red)';
+        const sinal = tipo === 'receita' ? '+' : '-';
+        const acao = tipo === 'receita' ? 'Receber' : 'Pagar';
+        const clsBtn = tipo === 'receita' ? 'mini-receber' : 'mini-pagar';
+        const marca = baixado
+            ? '<span style="font-size:11px; color:#28a745;">✔ baixada</span>'
+            : '<span style="font-size:11px; color:#b8860b;">• pendente</span>';
+        const btn = baixado
+            ? `<button class="mini-btn mini-reabrir" title="Reabrir" onclick="reabrir('${tipo}', ${item.id})">↺</button>`
+            : `<button class="mini-btn ${clsBtn}" onclick="darBaixa('${tipo}', ${item.id})">${acao}</button>`;
+        return `<div class="resumo-item"><span>${item.descricao} ${marca}</span><span style="color:${cor};">${sinal} R$ ${item.valor.toFixed(2)} ${btn}</span></div>`;
+    }
+
+    // ======== SALDO INICIAL DO MÊS ========
+    function mesAnterior(mesStr) {
+        const [ano, m] = mesStr.split('-').map(Number);
+        const a = m === 1 ? ano - 1 : ano;
+        const mm = m === 1 ? 12 : m - 1;
+        return a + '-' + String(mm).padStart(2, '0');
+    }
+
+    function mesesComDados() {
+        const s = new Set();
+        dados.receitas.forEach(r => s.add(r.mes));
+        dados.despesas.forEach(d => s.add(d.mes));
+        return s;
+    }
+
+    // Saldo inicial: valor manual (se definido) ou saldo final do último mês com dados
+    function saldoInicialMes(mesStr, modo) {
+        const saldos = dados.saldosIniciais || {};
+        if (saldos[mesStr] !== undefined) return saldos[mesStr];
+        let prev = mesAnterior(mesStr);
+        for (let i = 0; i < 24; i++) {
+            if (mesesComDados().has(prev)) return calcularMes(prev, modo).saldoFinal;
+            prev = mesAnterior(prev);
+        }
+        return 0;
+    }
+
+    // Cálculo central do Painel (mesmo modo "todas"/"baixadas")
+    function calcularMes(mesS, modo) {
+        const recMes = dados.receitas.filter(r => r.mes === mesS);
+        const despMes = dados.despesas.filter(d => d.mes === mesS);
+
+        const recConta = modo === 'baixadas' ? recMes.filter(r => r.recebido) : recMes;
+        const despConta = modo === 'baixadas' ? despMes.filter(d => d.pago) : despMes;
+
+        const saldoInicial = saldoInicialMes(mesS, modo);
+
+        const totalRecDia5 = recConta.filter(r => r.quinzena === 'dia5').reduce((s, r) => s + r.valor, 0);
+        const totalDespDia5 = despConta.filter(d => d.quinzena === 'dia5').reduce((s, d) => s + d.valor, 0);
+        const saldoDia5 = saldoInicial + totalRecDia5 - totalDespDia5;
+
+        const totalRecDia20 = recConta.filter(r => r.quinzena === 'dia20').reduce((s, r) => s + r.valor, 0);
+        const totalDespDia20 = despConta.filter(d => d.quinzena === 'dia20').reduce((s, d) => s + d.valor, 0);
+
+        const saldoTransferido = saldoDia5 > 0 ? saldoDia5 : 0;
+        const receitaTotalDia20 = totalRecDia20 + saldoTransferido;
+        const saldoDia20 = receitaTotalDia20 - totalDespDia20;
+
+        const saldoFinal = saldoDia5 < 0 ? saldoDia5 + totalRecDia20 - totalDespDia20 : saldoDia20;
+
+        return {
+            saldoInicial, totalRecDia5, totalDespDia5, saldoDia5,
+            totalRecDia20, totalDespDia20, saldoTransferido, receitaTotalDia20, saldoDia20, saldoFinal
+        };
+    }
+
+    function salvarSaldoInicial() {
+        const mes = document.getElementById('mesSelecionado').value;
+        if (!mes) return;
+        const v = parseFloat(document.getElementById('saldoInicialValor').value);
+        if (isNaN(v)) { alert('Digite um valor válido.'); return; }
+        dados.saldosIniciais = dados.saldosIniciais || {};
+        dados.saldosIniciais[mes] = v;
+        save();
+        renderPainel();
+    }
+
+    function usarSaldoAutomatico() {
+        const mes = document.getElementById('mesSelecionado').value;
+        if (!mes) return;
+        dados.saldosIniciais = dados.saldosIniciais || {};
+        if (dados.saldosIniciais[mes] !== undefined) delete dados.saldosIniciais[mes];
+        save();
+        renderPainel();
+    }
+
+    // ======== GERENCIAR ========
+    function renderGerenciar() {
+        const mes = document.getElementById('mesGerenciar').value;
+        const container = document.getElementById('gerenciarContent');
+        if (!mes) { container.innerHTML = '<p class="empty-msg">Selecione um mês.</p>'; return; }
+
+        const recMes = dados.receitas.filter(r => r.mes === mes);
+        const despMes = dados.despesas.filter(d => d.mes === mes);
+
+        let html = '';
+
+        // Receitas
+        html += '<div class="quinzena-title">💰 Receitas</div>';
+        if (recMes.length === 0) html += '<p class="empty-msg">Nenhuma receita neste mês.</p>';
+        recMes.forEach(r => {
+            html += `<div class="item">
+                <div class="item-header">
+                    <span class="item-name">${r.descricao}</span>
+                    <span class="item-value" style="color:var(--success-green);">R$ ${r.valor.toFixed(2)}</span>
+                </div>
+                <div style="font-size:12px; color:#888; margin-top:4px;">
+                    <span class="badge badge-receita">${r.tipo === 'salario' ? 'Salário' : 'Extra'}</span>
+                    <span class="badge ${r.quinzena === 'dia5' ? 'badge-dia5' : 'badge-dia20'}">${r.quinzena === 'dia5' ? 'Dia 5' : 'Dia 20'}</span>
+                    <span class="badge" style="background:${r.recebido ? 'var(--success-green)' : '#b8860b'}">${r.recebido ? 'Recebida' : 'A receber'}</span>
+                </div>
+                <div class="item-actions">
+                    ${r.recebido
+                        ? `<button class="btn-edit" onclick="reabrir('receita', ${r.id})">↺ Reabrir</button>`
+                        : `<button class="btn-edit" onclick="darBaixa('receita', ${r.id})">✔ Receber</button>`}
+                    <button class="btn-edit" onclick="openEdit('receita', ${r.id})">✏️ Editar</button>
+                    <button class="btn-delete" onclick="deleteItem('receita', ${r.id})">🗑️ Excluir</button>
+                </div>
+            </div>`;
+        });
+
+        // Despesas
+        html += '<div class="quinzena-title">📋 Despesas</div>';
+        if (despMes.length === 0) html += '<p class="empty-msg">Nenhuma despesa neste mês.</p>';
+        despMes.forEach(d => {
+            html += `<div class="item">
+                <div class="item-header">
+                    <span class="item-name">${d.descricao}</span>
+                    <span class="item-value" style="color:var(--danger-red);">R$ ${d.valor.toFixed(2)}</span>
+                </div>
+                <div style="font-size:12px; color:#888; margin-top:4px;">
+                    <span class="badge ${d.quinzena === 'dia5' ? 'badge-dia5' : 'badge-dia20'}">${d.quinzena === 'dia5' ? 'Dia 5' : 'Dia 20'}</span>
+                    <span class="badge" style="background:${d.pago ? 'var(--danger-red)' : '#b8860b'}">${d.pago ? 'Paga' : 'A pagar'}</span>
+                </div>
+                <div class="item-actions">
+                    ${d.pago
+                        ? `<button class="btn-edit" onclick="reabrir('despesa', ${d.id})">↺ Reabrir</button>`
+                        : `<button class="btn-edit" onclick="darBaixa('despesa', ${d.id})">✔ Pagar</button>`}
+                    <button class="btn-edit" onclick="openEdit('despesa', ${d.id})">✏️ Editar</button>
+                    <button class="btn-delete" onclick="deleteItem('despesa', ${d.id})">🗑️ Excluir</button>
+                </div>
+            </div>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // ======== EDITAR ========
+    function openEdit(tipo, id) {
+        editandoId = id;
+        editandoTipo = tipo;
+
+        let item;
+        if (tipo === 'receita') {
+            item = dados.receitas.find(r => r.id === id);
+            document.getElementById('modalTitle').textContent = 'Editar Receita';
+            document.getElementById('modalContent').innerHTML = `
+                <div class="form-group"><label>Descrição</label><input type="text" id="editDescricao" value="${item.descricao}"></div>
+                <div class="form-group"><label>Valor (R$)</label><input type="number" id="editValor" value="${item.valor}" step="0.01"></div>
+                <div class="form-group"><label>Quinzena</label>
+                    <select id="editQuinzena">
+                        <option value="dia5" ${item.quinzena === 'dia5' ? 'selected' : ''}>Dia 5</option>
+                        <option value="dia20" ${item.quinzena === 'dia20' ? 'selected' : ''}>Dia 20</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Tipo</label>
+                    <select id="editTipoRec">
+                        <option value="salario" ${item.tipo === 'salario' ? 'selected' : ''}>Salário</option>
+                        <option value="extra" ${item.tipo === 'extra' ? 'selected' : ''}>Receita Extra</option>
+                    </select>
+                </div>
+            `;
+        } else {
+            item = dados.despesas.find(d => d.id === id);
+            document.getElementById('modalTitle').textContent = 'Editar Despesa';
+            document.getElementById('modalContent').innerHTML = `
+                <div class="form-group"><label>Descrição</label><input type="text" id="editDescricao" value="${item.descricao}"></div>
+                <div class="form-group"><label>Valor (R$)</label><input type="number" id="editValor" value="${item.valor}" step="0.01"></div>
+                <div class="form-group"><label>Quinzena</label>
+                    <select id="editQuinzena">
+                        <option value="dia5" ${item.quinzena === 'dia5' ? 'selected' : ''}>Dia 5</option>
+                        <option value="dia20" ${item.quinzena === 'dia20' ? 'selected' : ''}>Dia 20</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('modal').style.display = 'block';
+    }
+
+    function saveEdit() {
+        const descricao = document.getElementById('editDescricao').value.trim().toUpperCase();
+        const valor = parseFloat(document.getElementById('editValor').value);
+        const quinzena = document.getElementById('editQuinzena').value;
+
+        if (!descricao || isNaN(valor) || valor <= 0) {
+            alert('Preencha corretamente!');
+            return;
+        }
+
+        if (editandoTipo === 'receita') {
+            const item = dados.receitas.find(r => r.id === editandoId);
+            if (item) {
+                item.descricao = descricao;
+                item.valor = valor;
+                item.quinzena = quinzena;
+                item.tipo = document.getElementById('editTipoRec').value;
+            }
+        } else {
+            const item = dados.despesas.find(d => d.id === editandoId);
+            if (item) {
+                item.descricao = descricao;
+                item.valor = valor;
+                item.quinzena = quinzena;
+            }
+        }
+
+        save();
+        closeModal();
+        renderGerenciar();
+        renderPainel();
+    }
+
+    function deleteItem(tipo, id) {
+        if (!confirm('Tem certeza que deseja excluir?')) return;
+
+        if (tipo === 'receita') {
+            dados.receitas = dados.receitas.filter(r => r.id !== id);
+        } else {
+            dados.despesas = dados.despesas.filter(d => d.id !== id);
+        }
+
+        save();
+        populateSelectMes();
+        renderGerenciar();
+        renderPainel();
+    }
+
+    // ======== BAIXA (PAGAR / RECEBER) ========
+    function darBaixa(tipo, id) {
+        if (tipo === 'receita') {
+            const r = dados.receitas.find(x => x.id === id);
+            if (r) r.recebido = true;
+        } else {
+            const d = dados.despesas.find(x => x.id === id);
+            if (d) d.pago = true;
+        }
+        save();
+        renderPainel();
+        renderGerenciar();
+    }
+
+    function reabrir(tipo, id) {
+        if (tipo === 'receita') {
+            const r = dados.receitas.find(x => x.id === id);
+            if (r) r.recebido = false;
+        } else {
+            const d = dados.despesas.find(x => x.id === id);
+            if (d) d.pago = false;
+        }
+        save();
+        renderPainel();
+        renderGerenciar();
+    }
+
+    // ======== DUPLICAR PARA O PRÓXIMO MÊS ========
+    function proxMes(mesStr) {
+        const [ano, m] = mesStr.split('-').map(Number);
+        const novoAno = m === 12 ? ano + 1 : ano;
+        const novoMes = m === 12 ? 1 : m + 1;
+        return novoAno + '-' + String(novoMes).padStart(2, '0');
+    }
+
+    function duplicarMes() {
+        const mes = document.getElementById('mesGerenciar').value;
+        if (!mes) { alert('Selecione um mês.'); return; }
+
+        const mesDestino = proxMes(mes);
+        const recOrig = dados.receitas.filter(r => r.mes === mes);
+        const despOrig = dados.despesas.filter(d => d.mes === mes);
+
+        if (recOrig.length === 0 && despOrig.length === 0) {
+            alert('Não há lançamentos para duplicar neste mês.');
+            return;
+        }
+
+        const jaTem = dados.receitas.some(r => r.mes === mesDestino) || dados.despesas.some(d => d.mes === mesDestino);
+        const msg = jaTem
+            ? `${formatMes(mesDestino)} já possui lançamentos. Deseja adicionar as cópias mesmo assim?`
+            : `Duplicar ${recOrig.length} receita(s) e ${despOrig.length} despesa(s) para ${formatMes(mesDestino)}?`;
+        if (!confirm(msg)) return;
+
+        let base = Date.now();
+        recOrig.forEach(r => {
+            dados.receitas.push({
+                id: base++,
+                descricao: r.descricao,
+                valor: r.valor,
+                quinzena: r.quinzena,
+                tipo: r.tipo,
+                mes: mesDestino,
+                recebido: false
+            });
+        });
+        despOrig.forEach(d => {
+            dados.despesas.push({
+                id: base++,
+                descricao: d.descricao,
+                valor: d.valor,
+                quinzena: d.quinzena,
+                mes: mesDestino,
+                pago: false
+            });
+        });
+
+        save();
+        populateSelectMes();
+        const sel = document.getElementById('mesGerenciar');
+        if ([].some.call(sel.options, o => o.value === mesDestino)) sel.value = mesDestino;
+        renderGerenciar();
+        renderPainel();
+        alert('Lançamentos duplicados para ' + formatMes(mesDestino) + '!');
+    }
+
+    // ======== HISTÓRICO (salvar cópia com dados embutidos) ========
+    function salvarHistorico() {
+        let html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const json = JSON.stringify(dados).replace(/</g, '\\u003c');
+        if (html.indexOf('const DADOS_EMBED = null') === -1) {
+            alert('Não foi possível gerar o histórico.');
+            return;
+        }
+        html = html.replace('const DADOS_EMBED = null', 'const DADOS_EMBED = ' + json);
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Control-historico-' + getMesAtual() + '.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert('Cópia salva com os dados até agora. Guarde o arquivo para rever quando quiser.');
+    }
+
+    function closeModal() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('modal').style.display = 'none';
+        editandoId = null;
+        editandoTipo = null;
+    }
+
+    // ======== PIN (proteção por 4 dígitos) ========
+    const PIN_KEY = 'controlPIN';
+
+    function getPin() { return localStorage.getItem(PIN_KEY); }
+    function pinDefinido() { return !!getPin(); }
+
+    function initPin() {
+        if (pinDefinido()) {
+            const overlay = document.getElementById('pinOverlay');
+            overlay.style.display = 'flex';
+            setTimeout(function () { document.getElementById('pinInput').focus(); }, 50);
+        }
+    }
+
+    function verificarPin() {
+        const valor = document.getElementById('pinInput').value.trim();
+        if (valor === getPin()) {
+            document.getElementById('pinErro').textContent = '';
+            document.getElementById('pinInput').value = '';
+            document.getElementById('pinOverlay').style.display = 'none';
+        } else {
+            document.getElementById('pinErro').textContent = 'PIN incorreto. Tente novamente.';
+            document.getElementById('pinInput').value = '';
+        }
+    }
+
+    function definirPin() {
+        const valor = document.getElementById('pinConfig').value.trim();
+        if (!/^\d{4}$/.test(valor)) {
+            alert('O PIN deve ter exatamente 4 dígitos.');
+            return;
+        }
+        localStorage.setItem(PIN_KEY, valor);
+        document.getElementById('pinConfig').value = '';
+        alert('PIN definido com sucesso!');
+    }
+
+    function removerPin() {
+        if (!pinDefinido()) { alert('Nenhum PIN definido.'); return; }
+        if (!confirm('Remover a proteção por PIN?')) return;
+        localStorage.removeItem(PIN_KEY);
+        document.getElementById('pinConfig').value = '';
+        alert('PIN removido.');
+    }
+
+    // ======== INIT ========
+    setDefaultMes();
+    populateSelectMes();
+    updateModoBtns();
+    renderPainel();
+    initPin();
+
+    // ======== SERVICE WORKER (PWA - instalar como app) ========
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('sw.js').catch(function () {});
+        });
+    }
+</script>
+
+</body>
+</html>

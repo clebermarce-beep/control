@@ -1,0 +1,26 @@
+{
+    "name": "Control - Controle Financeiro Pessoal",
+    "short_name": "Control",
+    "description": "Controle financeiro pessoal por quinzena, com baixa de despesas e receitas.",
+    "start_url": "./Control.html",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#f0f2f5",
+    "theme_color": "#0056b3",
+    "lang": "pt-BR",
+    "icons": [
+        {
+            "src": "./icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "./icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
