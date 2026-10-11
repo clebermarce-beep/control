@@ -152,6 +152,7 @@
         <div class="tab active" onclick="switchTab('painel')">Painel</div>
         <div class="tab" onclick="switchTab('receitas')">Receitas</div>
         <div class="tab" onclick="switchTab('despesas')">Despesas</div>
+        <div class="tab" onclick="switchTab('cartao')">Cartão</div>
         <div class="tab" onclick="switchTab('gerenciar')">Gerenciar</div>
     </div>
 
@@ -235,6 +236,40 @@
         <button class="btn btn-danger" onclick="addDespesa()">ADICIONAR DESPESA</button>
     </div>
 
+    <!-- ABA CARTÃO -->
+    <div id="tab-cartao" class="tab-content">
+        <h3>Cartões</h3>
+        <div id="cartoesContent"></div>
+        <button class="btn" style="background:#666; color:white; margin-top:5px; margin-bottom:20px;" onclick="adicionarCartao()">＋ Adicionar Cartão</button>
+
+        <div class="quinzena-title">💳 Nova Compra</div>
+        <div class="form-group">
+            <label>Descrição</label>
+            <input type="text" id="compDescricao" placeholder="Ex: Tênis, TV, Supermercado...">
+        </div>
+        <div class="form-group">
+            <label>Valor total (R$)</label>
+            <input type="number" id="compValor" placeholder="0.00" step="0.01" oninput="atualizarPreview()">
+        </div>
+        <div class="form-group">
+            <label>Parcelas</label>
+            <select id="compParcelas" onchange="atualizarPreview()"></select>
+        </div>
+        <div class="form-group">
+            <label>Cartão</label>
+            <select id="compCartao"></select>
+        </div>
+        <div class="form-group">
+            <label>Mês da 1ª parcela (quando entra na fatura)</label>
+            <input type="month" id="compMesInicio" onchange="atualizarPreview()">
+        </div>
+        <div id="compPreview" style="font-size:12px; color:#888; margin-bottom:10px;"></div>
+        <button class="btn btn-add" onclick="addCompra()">ADICIONAR COMPRA</button>
+
+        <div class="quinzena-title" style="margin-top:25px;">📋 Compras</div>
+        <div id="comprasContent"></div>
+    </div>
+
     <!-- ABA GERENCIAR -->
     <div id="tab-gerenciar" class="tab-content">
         <h3>Gerenciar Lançamentos</h3>
@@ -307,10 +342,19 @@
     let dados = {
         receitas: dadosBase.receitas || [],
         despesas: dadosBase.despesas || [],
-        saldosIniciais: dadosBase.saldosIniciais || {}
+        saldosIniciais: dadosBase.saldosIniciais || {},
+        cartoes: dadosBase.cartoes || [],
+        comprasCartao: dadosBase.comprasCartao || []
     };
     dados.receitas.forEach(r => { if (typeof r.recebido !== 'boolean') r.recebido = false; });
     dados.despesas.forEach(d => { if (typeof d.pago !== 'boolean') d.pago = false; });
+    dados.comprasCartao.forEach(c => { if (typeof c.pagas !== 'object' || c.pagas === null) c.pagas = {}; });
+    if (!Array.isArray(dados.cartoes) || dados.cartoes.length === 0) {
+        dados.cartoes = [
+            { id: 1, nome: 'CARTÃO ITAÚ', limite: 0, quinzena: 'dia5' },
+            { id: 2, nome: 'CARTÃO BRADESCO', limite: 0, quinzena: 'dia20' }
+        ];
+    }
     let editandoId = null;
     let editandoTipo = null;
     let modoSaldo = localStorage.getItem('controlModoSaldo') || 'todas';
@@ -330,6 +374,7 @@
         meses.add(getMesAtual());
         dados.receitas.forEach(r => meses.add(r.mes));
         dados.despesas.forEach(d => meses.add(d.mes));
+        dados.comprasCartao.forEach(c => parcelasDeCompra(c).forEach(p => meses.add(p.mes)));
         return Array.from(meses).sort().reverse();
     }
 
@@ -359,17 +404,20 @@
         const mesAtual = getMesAtual();
         document.getElementById('recMes').value = mesAtual;
         document.getElementById('despMes').value = mesAtual;
+        const cm = document.getElementById('compMesInicio');
+        if (cm) cm.value = mesAtual;
     }
 
     // ======== TABS ========
     function switchTab(tab) {
         document.querySelectorAll('.tab').forEach((t, i) => {
-            const tabs = ['painel', 'receitas', 'despesas', 'gerenciar'];
+            const tabs = ['painel', 'receitas', 'despesas', 'cartao', 'gerenciar'];
             t.classList.toggle('active', tabs[i] === tab);
         });
         document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
         document.getElementById('tab-' + tab).classList.add('active');
         if (tab === 'painel') renderPainel();
+        if (tab === 'cartao') renderCartao();
         if (tab === 'gerenciar') renderGerenciar();
     }
 
@@ -455,6 +503,10 @@
         const recDia20List = recMes.filter(r => r.quinzena === 'dia20');
         const despDia20List = despMes.filter(d => d.quinzena === 'dia20');
 
+        const cartMes = parcelasNoMes(mes);
+        const cartDia5 = cartMes.filter(p => getCartao(p.compra.cartaoId) && getCartao(p.compra.cartaoId).quinzena === 'dia5');
+        const cartDia20 = cartMes.filter(p => getCartao(p.compra.cartaoId) && getCartao(p.compra.cartaoId).quinzena === 'dia20');
+
         const c = calcularMes(mes, modoSaldo);
         const rotuloRec = modoSaldo === 'baixadas' ? 'Total Recebido' : 'Total Receitas';
         const rotuloDesp = modoSaldo === 'baixadas' ? 'Total Pago' : 'Total Despesas';
@@ -477,8 +529,9 @@
 
         html += '<div class="item" style="border-left: 4px solid var(--danger-red);">';
         html += '<div style="font-weight:bold; color:var(--danger-red); margin-bottom:8px;">📋 Despesas</div>';
-        if (despDia5List.length === 0) html += '<p class="empty-msg">Nenhuma despesa.</p>';
+        if (despDia5List.length === 0 && cartDia5.length === 0) html += '<p class="empty-msg">Nenhuma despesa.</p>';
         despDia5List.forEach(d => { html += linhaItem('despesa', d); });
+        cartDia5.forEach(p => { html += linhaParcela(p); });
         html += `<div class="resumo-item" style="font-weight:bold; border-top:1px solid #ddd; padding-top:8px;"><span>${rotuloDesp}</span><span style="color:var(--danger-red);">R$ ${c.totalDespDia5.toFixed(2)}</span></div>`;
         html += '</div>';
 
@@ -502,8 +555,9 @@
 
         html += '<div class="item" style="border-left: 4px solid var(--danger-red);">';
         html += '<div style="font-weight:bold; color:var(--danger-red); margin-bottom:8px;">📋 Despesas</div>';
-        if (despDia20List.length === 0) html += '<p class="empty-msg">Nenhuma despesa.</p>';
+        if (despDia20List.length === 0 && cartDia20.length === 0) html += '<p class="empty-msg">Nenhuma despesa.</p>';
         despDia20List.forEach(d => { html += linhaItem('despesa', d); });
+        cartDia20.forEach(p => { html += linhaParcela(p); });
         html += `<div class="resumo-item" style="font-weight:bold; border-top:1px solid #ddd; padding-top:8px;"><span>${rotuloDesp}</span><span style="color:var(--danger-red);">R$ ${c.totalDespDia20.toFixed(2)}</span></div>`;
         html += '</div>';
 
@@ -538,6 +592,267 @@
         return `<div class="resumo-item"><span>${item.descricao} ${marca}</span><span style="color:${cor};">${sinal} R$ ${item.valor.toFixed(2)} ${btn}</span></div>`;
     }
 
+    // ======== CARTÕES DE CRÉDITO E COMPRAS ========
+    function getCartao(id) {
+        return dados.cartoes.find(c => c.id === id);
+    }
+
+    function mesAvancar(mesStr, n) {
+        const [a, m] = mesStr.split('-').map(Number);
+        const total = a * 12 + (m - 1) + n;
+        return Math.floor(total / 12) + '-' + String((total % 12) + 1).padStart(2, '0');
+    }
+
+    // Divide a compra em parcelas mensais consecutivas a partir do mês inicial.
+    // A última parcela absorve o resto dos centavos para o total bater exato.
+    function parcelasDeCompra(c) {
+        const base = Math.round((c.valorTotal / c.parcelas) * 100) / 100;
+        const r = [];
+        for (let i = 0; i < c.parcelas; i++) {
+            const ultima = i === c.parcelas - 1;
+            const valor = ultima
+                ? Math.round((c.valorTotal - base * (c.parcelas - 1)) * 100) / 100
+                : base;
+            r.push({ mes: mesAvancar(c.mesInicio, i), numero: i + 1, total: c.parcelas, valor: Math.round(valor * 100) / 100 });
+        }
+        return r;
+    }
+
+    // Parcelas de todas as compras que vencem no mês informado
+    function parcelasNoMes(mes) {
+        const r = [];
+        dados.comprasCartao.forEach(c => {
+            parcelasDeCompra(c).forEach(p => {
+                if (p.mes === mes) r.push({ compra: c, mes, numero: p.numero, total: p.total, valor: p.valor, pago: !!(c.pagas && c.pagas[mes]) });
+            });
+        });
+        return r;
+    }
+
+    function linhaParcela(p) {
+        const cartao = getCartao(p.compra.cartaoId);
+        const nomeC = cartao ? cartao.nome : 'CARTÃO';
+        const marca = p.pago
+            ? '<span style="font-size:11px; color:#28a745;">✔ paga</span>'
+            : '<span style="font-size:11px; color:#b8860b;">• pendente</span>';
+        const btn = p.pago
+            ? `<button class="mini-btn mini-reabrir" title="Reabrir" onclick="pagarParcela(${p.compra.id}, '${p.mes}')">↺</button>`
+            : `<button class="mini-btn mini-pagar" onclick="pagarParcela(${p.compra.id}, '${p.mes}')">Pagar</button>`;
+        return `<div class="resumo-item"><span>${p.compra.descricao} (${p.numero}/${p.total}) 💳 ${nomeC} ${marca}</span><span style="color:var(--danger-red);">- R$ ${p.valor.toFixed(2)} ${btn}</span></div>`;
+    }
+
+    // Alterna entre paga / a pagar de uma parcela específica (compra + mês)
+    function pagarParcela(compraId, mes) {
+        const c = dados.comprasCartao.find(x => x.id === compraId);
+        if (!c) return;
+        c.pagas = c.pagas || {};
+        c.pagas[mes] = !c.pagas[mes];
+        save();
+        renderPainel();
+    }
+
+    function comprometidoCartao(cartaoId) {
+        let t = 0;
+        dados.comprasCartao.forEach(c => {
+            if (c.cartaoId !== cartaoId) return;
+            parcelasDeCompra(c).forEach(p => { if (!c.pagas || !c.pagas[p.mes]) t += p.valor; });
+        });
+        return Math.round(t * 100) / 100;
+    }
+
+    function atualizarPreview() {
+        const v = parseFloat(document.getElementById('compValor').value);
+        const n = parseInt(document.getElementById('compParcelas').value, 10);
+        const m = document.getElementById('compMesInicio').value;
+        const el = document.getElementById('compPreview');
+        if (!el) return;
+        if (isNaN(v) || v <= 0 || !n || !m) { el.textContent = ''; return; }
+        const base = Math.round(v / n * 100) / 100;
+        const ult = Math.round((v - base * (n - 1)) * 100) / 100;
+        let txt = n + 'x de R$ ' + base.toFixed(2);
+        if (ult !== base) txt += ' (última parcela R$ ' + ult.toFixed(2) + ')';
+        txt += ' · 1ª em ' + formatMes(m);
+        el.textContent = txt;
+    }
+
+    function populateCompraSelects() {
+        const selP = document.getElementById('compParcelas');
+        if (selP) {
+            const cur = selP.value;
+            selP.innerHTML = '';
+            for (let n = 1; n <= 24; n++) {
+                const o = document.createElement('option');
+                o.value = n; o.textContent = n + 'x';
+                selP.appendChild(o);
+            }
+            if (cur) selP.value = cur;
+        }
+        const selC = document.getElementById('compCartao');
+        if (selC) {
+            const cur2 = selC.value;
+            selC.innerHTML = '';
+            dados.cartoes.forEach(k => {
+                const o = document.createElement('option');
+                o.value = k.id; o.textContent = k.nome;
+                selC.appendChild(o);
+            });
+            if (cur2 && dados.cartoes.some(k => String(k.id) === cur2)) selC.value = cur2;
+        }
+        atualizarPreview();
+    }
+
+    function addCompra() {
+        const descricao = document.getElementById('compDescricao').value.trim();
+        const valor = parseFloat(document.getElementById('compValor').value);
+        const parcelas = parseInt(document.getElementById('compParcelas').value, 10);
+        const cartaoId = parseInt(document.getElementById('compCartao').value, 10);
+        const mesInicio = document.getElementById('compMesInicio').value;
+
+        if (!descricao || isNaN(valor) || valor <= 0 || !mesInicio || !parcelas || parcelas < 1) {
+            alert('Preencha todos os campos corretamente!');
+            return;
+        }
+
+        dados.comprasCartao.push({
+            id: Date.now(),
+            cartaoId,
+            descricao: descricao.toUpperCase(),
+            valorTotal: valor,
+            parcelas,
+            mesInicio,
+            pagas: {}
+        });
+
+        save();
+        document.getElementById('compDescricao').value = '';
+        document.getElementById('compValor').value = '';
+        setDefaultMes();
+        populateSelectMes();
+        renderCartao();
+        atualizarPreview();
+        alert('Compra adicionada! As parcelas entram automaticamente nas despesas de cada mês.');
+    }
+
+    function excluirCompra(id) {
+        if (!confirm('Excluir esta compra e remover todas as parcelas dos meses?')) return;
+        dados.comprasCartao = dados.comprasCartao.filter(c => c.id !== id);
+        save();
+        populateSelectMes();
+        renderCartao();
+        renderPainel();
+    }
+
+    function openEditCompra(id) {
+        const c = dados.comprasCartao.find(x => x.id === id);
+        if (!c) return;
+        editandoId = id;
+        editandoTipo = 'compra';
+        document.getElementById('modalTitle').textContent = 'Editar Compra';
+        const opts = dados.cartoes.map(k => `<option value="${k.id}" ${k.id === c.cartaoId ? 'selected' : ''}>${k.nome}</option>`).join('');
+        let par = '';
+        for (let n = 1; n <= 24; n++) par += `<option value="${n}" ${n === c.parcelas ? 'selected' : ''}>${n}x</option>`;
+        document.getElementById('modalContent').innerHTML = `
+            <div class="form-group"><label>Descrição</label><input type="text" id="editDescricao" value="${c.descricao}"></div>
+            <div class="form-group"><label>Valor total (R$)</label><input type="number" id="editValor" value="${c.valorTotal}" step="0.01"></div>
+            <div class="form-group"><label>Parcelas</label><select id="editParcelas">${par}</select></div>
+            <div class="form-group"><label>Cartão</label><select id="editCartao">${opts}</select></div>
+            <div class="form-group"><label>Mês da 1ª parcela</label><input type="month" id="editMesInicio" value="${c.mesInicio}"></div>
+        `;
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('modal').style.display = 'block';
+    }
+
+    function renderCartao() {
+        const htmlCart = dados.cartoes.map(k => {
+            const comp = comprometidoCartao(k.id);
+            const disp = k.limite - comp;
+            return `<div class="item">
+                <div class="form-group" style="margin-bottom:6px;"><label style="font-size:12px;">Nome do Cartão</label><input type="text" id="cartaoNome${k.id}" value="${k.nome}"></div>
+                <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:6px;">
+                    <div style="flex:1;"><label style="font-size:12px;">Limite (R$)</label><input type="number" id="cartaoLimite${k.id}" step="0.01" value="${k.limite}"></div>
+                    <div style="flex:1;"><label style="font-size:12px;">Quinzena da fatura</label>
+                        <select id="cartaoQ${k.id}">
+                            <option value="dia5"${k.quinzena === 'dia5' ? ' selected' : ''}>Dia 5 (1ª quinzena)</option>
+                            <option value="dia20"${k.quinzena === 'dia20' ? ' selected' : ''}>Dia 20 (2ª quinzena)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="resumo-item"><span>Comprometido (parcelas a pagar)</span><span style="color:var(--danger-red);">R$ ${comp.toFixed(2)}</span></div>
+                <div class="resumo-item"><span>Disponível</span><span style="color:${disp >= 0 ? 'var(--success-green)' : 'var(--danger-red)'};">R$ ${disp.toFixed(2)}</span></div>
+                <div class="item-actions">
+                    <button class="btn-edit" onclick="salvarCartao(${k.id})">💾 Salvar</button>
+                    <button class="btn-delete" onclick="removerCartao(${k.id})">🗑️ Remover</button>
+                </div>
+            </div>`;
+        }).join('');
+        document.getElementById('cartoesContent').innerHTML = htmlCart || '<p class="empty-msg">Nenhum cartão. Clique em "Adicionar Cartão".</p>';
+
+        const compras = dados.comprasCartao.slice().reverse();
+        let htmlC = '<p class="empty-msg">Nenhuma compra no cartão.</p>';
+        if (compras.length > 0) {
+            htmlC = compras.map(c => {
+                const par = parcelasDeCompra(c);
+                const cart = getCartao(c.cartaoId);
+                const nomeCart = cart ? cart.nome : '?';
+                const pagasQt = par.filter(x => c.pagas && c.pagas[x.mes]).length;
+                const statusBg = pagasQt === c.parcelas ? 'var(--success-green)' : '#b8860b';
+                return `<div class="item">
+                    <div class="item-header">
+                        <span class="item-name">${c.descricao}</span>
+                        <span class="item-value">R$ ${c.valorTotal.toFixed(2)}</span>
+                    </div>
+                    <div style="font-size:12px; color:#888; margin-top:4px;">
+                        <span class="badge" style="background:#3b5998;">💳 ${nomeCart}</span>
+                        <span class="badge" style="background:#495057;">${c.parcelas}x</span>
+                        <span class="badge" style="background:#6c757d;">1ª ${formatMes(c.mesInicio)}</span>
+                        <span class="badge" style="background:${statusBg};">${pagasQt}/${c.parcelas} pagas</span>
+                    </div>
+                    <div class="item-actions">
+                        <button class="btn-edit" onclick="openEditCompra(${c.id})">✏️ Editar</button>
+                        <button class="btn-delete" onclick="excluirCompra(${c.id})">🗑️ Excluir</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        document.getElementById('comprasContent').innerHTML = htmlC;
+        populateCompraSelects();
+    }
+
+    function adicionarCartao() {
+        const nome = prompt('Nome do novo cartão:');
+        if (!nome || !nome.trim()) return;
+        const maxId = dados.cartoes.reduce((m, c) => Math.max(m, c.id), 0);
+        dados.cartoes.push({ id: maxId + 1, nome: nome.trim().toUpperCase(), limite: 0, quinzena: 'dia20' });
+        save();
+        renderCartao();
+        renderPainel();
+    }
+
+    function salvarCartao(id) {
+        const k = dados.cartoes.find(c => c.id === id);
+        if (!k) return;
+        const nome = document.getElementById('cartaoNome' + id).value.trim();
+        const limite = parseFloat(document.getElementById('cartaoLimite' + id).value);
+        const q = document.getElementById('cartaoQ' + id).value;
+        if (!nome) { alert('Informe o nome do cartão.'); return; }
+        k.nome = nome.toUpperCase();
+        k.limite = isNaN(limite) ? 0 : limite;
+        k.quinzena = q;
+        save();
+        renderCartao();
+        renderPainel();
+    }
+
+    function removerCartao(id) {
+        if (!confirm('Remover este cartão e todas as compras dele?')) return;
+        dados.cartoes = dados.cartoes.filter(c => c.id !== id);
+        dados.comprasCartao = dados.comprasCartao.filter(c => c.cartaoId !== id);
+        save();
+        populateSelectMes();
+        renderCartao();
+        renderPainel();
+    }
+
     // ======== SALDO INICIAL DO MÊS ========
     function mesAnterior(mesStr) {
         const [ano, m] = mesStr.split('-').map(Number);
@@ -550,6 +865,7 @@
         const s = new Set();
         dados.receitas.forEach(r => s.add(r.mes));
         dados.despesas.forEach(d => s.add(d.mes));
+        dados.comprasCartao.forEach(c => parcelasDeCompra(c).forEach(p => s.add(p.mes)));
         return s;
     }
 
@@ -573,14 +889,21 @@
         const recConta = modo === 'baixadas' ? recMes.filter(r => r.recebido) : recMes;
         const despConta = modo === 'baixadas' ? despMes.filter(d => d.pago) : despMes;
 
+        // Parcelas de cartão do mês entram automaticamente nas despesas da quinzena do cartão
+        const cartMes = parcelasNoMes(mesS);
+        const cartDia5 = cartMes.filter(p => getCartao(p.compra.cartaoId) && getCartao(p.compra.cartaoId).quinzena === 'dia5');
+        const cartDia20 = cartMes.filter(p => getCartao(p.compra.cartaoId) && getCartao(p.compra.cartaoId).quinzena === 'dia20');
+        const totalCartDia5 = cartDia5.filter(p => modo !== 'baixadas' || p.pago).reduce((s, p) => s + p.valor, 0);
+        const totalCartDia20 = cartDia20.filter(p => modo !== 'baixadas' || p.pago).reduce((s, p) => s + p.valor, 0);
+
         const saldoInicial = saldoInicialMes(mesS, modo);
 
         const totalRecDia5 = recConta.filter(r => r.quinzena === 'dia5').reduce((s, r) => s + r.valor, 0);
-        const totalDespDia5 = despConta.filter(d => d.quinzena === 'dia5').reduce((s, d) => s + d.valor, 0);
+        const totalDespDia5 = despConta.filter(d => d.quinzena === 'dia5').reduce((s, d) => s + d.valor, 0) + totalCartDia5;
         const saldoDia5 = saldoInicial + totalRecDia5 - totalDespDia5;
 
         const totalRecDia20 = recConta.filter(r => r.quinzena === 'dia20').reduce((s, r) => s + r.valor, 0);
-        const totalDespDia20 = despConta.filter(d => d.quinzena === 'dia20').reduce((s, d) => s + d.valor, 0);
+        const totalDespDia20 = despConta.filter(d => d.quinzena === 'dia20').reduce((s, d) => s + d.valor, 0) + totalCartDia20;
 
         const saldoTransferido = saldoDia5 > 0 ? saldoDia5 : 0;
         const receitaTotalDia20 = totalRecDia20 + saldoTransferido;
@@ -720,6 +1043,33 @@
     }
 
     function saveEdit() {
+        if (editandoTipo === 'compra') {
+            const c = dados.comprasCartao.find(x => x.id === editandoId);
+            if (c) {
+                const descricao = document.getElementById('editDescricao').value.trim().toUpperCase();
+                const valor = parseFloat(document.getElementById('editValor').value);
+                const parcelas = parseInt(document.getElementById('editParcelas').value, 10);
+                const mes = document.getElementById('editMesInicio').value;
+                const cartaoId = parseInt(document.getElementById('editCartao').value, 10);
+                if (!descricao || isNaN(valor) || valor <= 0 || !mes || !parcelas || parcelas < 1) {
+                    alert('Preencha corretamente!');
+                    return;
+                }
+                c.descricao = descricao;
+                c.valorTotal = valor;
+                c.parcelas = parcelas;
+                c.mesInicio = mes;
+                c.cartaoId = cartaoId;
+                c.pagas = {};
+            }
+            save();
+            closeModal();
+            renderCartao();
+            renderPainel();
+            populateSelectMes();
+            return;
+        }
+
         const descricao = document.getElementById('editDescricao').value.trim().toUpperCase();
         const valor = parseFloat(document.getElementById('editValor').value);
         const quinzena = document.getElementById('editQuinzena').value;
@@ -929,6 +1279,7 @@
     // ======== INIT ========
     setDefaultMes();
     populateSelectMes();
+    populateCompraSelects();
     updateModoBtns();
     renderPainel();
     initPin();
